@@ -54,7 +54,8 @@ export const MORGES_SCENARIO: ResidualLandValueInput = {
 export interface ReportSite {
   locality: string;
   cadastralReference: string;
-  cadastralSheet: string;
+  /** Feuille cadastrale, uniquement lorsqu'elle est connue. */
+  cadastralSheet?: string;
   benchmark: {
     areaLabel: string;
     medianChfPerParcelM2: number;

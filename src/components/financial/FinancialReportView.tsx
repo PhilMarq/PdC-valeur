@@ -189,7 +189,9 @@ export function FinancialReportView({
             <dt className="font-sans text-[8px] tracking-[0.12em] text-[#5e6872] uppercase">Référence cadastrale</dt>
             <dd className="mt-px text-[12.5px] leading-tight font-medium">
               Parcelle n° {site.cadastralReference}
-              <span className="font-normal text-[#5e6872]"> · feuille {site.cadastralSheet}</span>
+              {site.cadastralSheet ? (
+                <span className="font-normal text-[#5e6872]"> · feuille {site.cadastralSheet}</span>
+              ) : null}
             </dd>
           </div>
           <div className="text-right">

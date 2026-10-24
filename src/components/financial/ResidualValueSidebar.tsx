@@ -45,6 +45,7 @@ type ViabilityTone = "green" | "orange" | "red";
 interface ResidualValueSidebarProps {
   geometry?: GeometricInputs;
   reportSite?: ReportSite;
+  syncedFromStudio?: boolean;
   className?: string;
 }
 
@@ -71,6 +72,7 @@ const INITIAL_CONTROLS: ControlState = {
 export function ResidualValueSidebar({
   geometry = MORGES_GEOMETRY,
   reportSite = MORGES_REPORT_SITE,
+  syncedFromStudio = false,
   className,
 }: ResidualValueSidebarProps) {
   const [controls, setControls] = useState<ControlState>(INITIAL_CONTROLS);
@@ -104,10 +106,19 @@ export function ResidualValueSidebar({
       )}
     >
       <header className="border-b border-neutral-200 px-5 py-4">
+        {syncedFromStudio ? (
+          <p
+            data-testid="studio-sync"
+            className="mb-2 inline-flex rounded-full bg-neutral-100 px-2.5 py-1 text-[11px] font-medium text-neutral-600"
+          >
+            Projet synchronisé depuis le Studio 3D
+          </p>
+        ) : null}
         <h1 className="text-lg font-semibold tracking-tight">Bilan Foncier Résiduel</h1>
         <p className="mt-1 text-xs text-neutral-500">
-          {geometry.canton} · {geometry.zone}
+          {reportSite.locality}, {geometry.canton} · parcelle n° {reportSite.cadastralReference}
         </p>
+        <p className="text-xs text-neutral-400">{geometry.zone}</p>
         <ul className="mt-3 flex flex-wrap gap-2">
           <MetricBadge icon={Box} label={`${formatGrouped(geometry.volumeSia416M3)} m³ SIA`} />
           <MetricBadge icon={Ruler} label={`${formatGrouped(geometry.sreM2)} m² SRE`} />
