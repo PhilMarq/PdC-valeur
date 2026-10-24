@@ -15,6 +15,7 @@ export default function App() {
         syncedFromStudio={project.syncedFromStudio}
         userId={project.userId}
         accessToken={project.accessToken}
+        reportAuthor={project.reportAuthor}
       />
     </div>
   );

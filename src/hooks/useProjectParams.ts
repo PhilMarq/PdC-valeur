@@ -34,6 +34,8 @@ export interface ProjectParams {
   userId: string | null;
   /** Jeton d'accès Supabase, s'il est transmis à côté de l'identifiant. */
   accessToken: string | null;
+  /** Auteur du rapport, `author` puis `company`. Absent si l'URL ne le donne pas. */
+  reportAuthor: string | null;
 }
 
 export function useProjectParams(search?: string): ProjectParams {
@@ -47,6 +49,7 @@ export function readProjectParams(search: string): ProjectParams {
   const parcelNumber = readLabel(params.get("parcelle"));
   const accessToken = readAccessToken(params.get("token"));
   const userId = readUserId(params.get("userId")) ?? readUserId(params.get("token")) ?? userIdFromAccessToken(accessToken);
+  const reportAuthor = readAuthor(params.get("author")) ?? readAuthor(params.get("company"));
 
   const geometry: GeometricInputs = {
     sreM2: readPositive(params.get("sre")) ?? MORGES_GEOMETRY.sreM2,
@@ -76,6 +79,7 @@ export function readProjectParams(search: string): ProjectParams {
     syncedFromStudio: PARAM_KEYS.some((key) => params.has(key)),
     userId,
     accessToken,
+    reportAuthor,
   };
 }
 
@@ -97,6 +101,12 @@ function readLabel(raw: string | null): string | null {
   if (raw === null) return null;
   const trimmed = raw.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function readAuthor(raw: string | null): string | null {
+  const label = readLabel(raw)?.replace(/\s+/g, " ");
+  if (!label) return null;
+  return label.length > 80 ? `${label.slice(0, 79).trimEnd()}…` : label;
 }
 
 function readUserId(raw: string | null): string | null {

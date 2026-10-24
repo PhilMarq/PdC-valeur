@@ -14,6 +14,9 @@ import type {
 
 const COMFORT_MARGIN = 0.12;
 const COMFORT_RESIDUAL_SHARE = 0.12;
+const DEFAULT_REPORT_AUTHOR = "Utilisateur certifié";
+const LIABILITY_NOTICE =
+  "Responsabilité & exactitude : Ce rapport est une simulation indicative générée à partir des paramètres saisis ou validés par l'utilisateur. L'exactitude et la pertinence des hypothèses financières (prix de vente, coûts de construction, marges) relèvent de la seule responsabilité de l'utilisateur professionnel, à qui il appartient de contrôler, d'ajuster manuellement ces valeurs selon sa connaissance du marché et de les faire valider par ses experts légaux, notariaux et bancaires.";
 
 const CANTON_NAMES: Record<SwissCanton, string> = {
   AG: "Argovie",
@@ -71,6 +74,8 @@ export interface FinancialReportViewProps {
   result: ResidualLandValueResult;
   site?: ReportSite;
   issuedAt?: Date;
+  /** Nom affiché après « Rapport généré par ». Vide : mention par défaut. */
+  author?: string | null;
 }
 
 /**
@@ -83,6 +88,7 @@ export function FinancialReportView({
   result,
   site = MORGES_REPORT_SITE,
   issuedAt = new Date(),
+  author = null,
 }: FinancialReportViewProps) {
   const status = operationStatus(result, financials.developerMarginRateOnExit);
   const basis = result.exitSurfaceBasis === "sre" ? "SRE" : "SPd";
@@ -90,6 +96,7 @@ export function FinancialReportView({
   const otherSurfaceM2 = result.exitSurfaceBasis === "sre" ? geometry.spdM2 : geometry.sreM2;
   const equivalentPrice = otherSurfaceM2 > 0 ? result.exitValueChf / otherSurfaceM2 : 0;
   const cantonName = CANTON_NAMES[geometry.canton];
+  const authorLabel = author?.trim() ? author.trim() : DEFAULT_REPORT_AUTHOR;
   const notes = result.warnings.filter((warning) => warning.code !== "negative_residual");
 
   const rows: AccountRow[] = [
@@ -154,16 +161,16 @@ export function FinancialReportView({
 
   return (
     <article
-      className="financial-report flex min-h-[297mm] w-[210mm] shrink-0 flex-col bg-white px-[12mm] pt-[8mm] pb-[7mm] text-[#1b2430] shadow-[0_18px_50px_rgba(20,24,31,0.28)] print:shadow-none"
+      className="financial-report flex min-h-[297mm] w-[210mm] shrink-0 flex-col bg-white px-[12mm] pt-[7mm] pb-[6mm] text-nardo shadow-[0_18px_50px_rgba(18,19,22,0.28)] print:shadow-none"
       data-testid="financial-report"
       lang="fr"
     >
       <header>
-        <div className="h-[2.5px] bg-[#1b2430]" />
-        <div className="mt-px h-px bg-[#1b2430]" />
-        <div className="mt-[4mm] flex items-start justify-between gap-[6mm]">
+        <div className="h-[2.5px] bg-fluo" />
+        <div className="mt-px h-px bg-nardo" />
+        <div className="mt-[3.5mm] flex items-start justify-between gap-[6mm]">
           <div className="min-w-0">
-            <p className="font-sans text-[9px] font-medium tracking-[0.16em] text-[#7c6844] uppercase">
+            <p className="font-sans text-[9px] font-medium tracking-[0.16em] text-nardo uppercase">
               Bilan financier & potentiel foncier
             </p>
             <h1
@@ -173,12 +180,10 @@ export function FinancialReportView({
               Faisabilité Financière & Valeur Résiduelle du Foncier
             </h1>
           </div>
-          <p className="flex size-[11mm] shrink-0 items-center justify-center border border-[#1b2430] font-sans text-[11px] font-semibold tracking-wide">
-            {geometry.canton}
-          </p>
+          <ReportLogo />
         </div>
 
-        <dl className="mt-[4mm] grid grid-cols-[1.4fr_1fr_auto] gap-x-[6mm] gap-y-[1mm] border-y border-[#e4dfd6] py-[2.5mm]">
+        <dl className="mt-[3mm] grid grid-cols-[1.4fr_1fr_auto] gap-x-[6mm] gap-y-[1mm] border-y border-nardo/15 py-[2mm]">
           <div>
             <dt className="font-sans text-[8px] tracking-[0.12em] text-[#5e6872] uppercase">Localisation</dt>
             <dd className="mt-px text-[12.5px] leading-tight font-medium">
@@ -210,10 +215,16 @@ export function FinancialReportView({
               Dossier BF-{site.cadastralReference}
             </dd>
           </div>
+          <div className="col-span-3">
+            <dt className="sr-only">Auteur</dt>
+            <dd className="font-sans text-[9px] leading-tight text-[#5e6872]">
+              Rapport généré par : <span className="font-medium text-nardo">{authorLabel}</span>
+            </dd>
+          </div>
         </dl>
       </header>
 
-      <div className="mt-[3.5mm] space-y-[3.2mm]">
+      <div className="mt-[2.8mm] space-y-[2.6mm]">
         <section className="break-inside-avoid">
           <SectionHeading index="01" title="Hypothèses de sortie" kicker="Exit value" />
           <div className="mt-[2.5mm] grid grid-cols-4 gap-[3mm]">
@@ -253,7 +264,7 @@ export function FinancialReportView({
               poste
             </caption>
             <thead>
-              <tr className="border-b border-[#1b2430] font-sans text-[8px] tracking-[0.12em] text-[#5e6872] uppercase">
+              <tr className="border-b border-nardo font-sans text-[8px] tracking-[0.12em] text-[#5e6872] uppercase">
                 <th scope="col" className="py-[0.8mm] text-left font-medium">
                   Poste
                 </th>
@@ -271,8 +282,8 @@ export function FinancialReportView({
                   key={row.label}
                   className={
                     row.tone === "plain"
-                      ? "border-b border-[#ece7de]"
-                      : "border-t border-[#1b2430]"
+                      ? "border-b border-nardo/10"
+                      : "border-t border-fluo"
                   }
                 >
                   <th
@@ -306,17 +317,17 @@ export function FinancialReportView({
 
         <section className="break-inside-avoid">
           <SectionHeading index="03" title="Indicateur clé" kicker="Valeur résiduelle" />
-          <div className="mt-[2.5mm] border border-[#1b2430] p-[1mm]">
+          <div className="mt-[2mm] border-2 border-fluo p-[0.7mm]">
             <div
-              className="border border-[#1b2430] px-[4.5mm] py-[2.6mm]"
+              className="border border-nardo px-[4.5mm] py-[2mm]"
               data-testid="report-max-purchase"
               data-amount={result.maxPurchasePriceChf}
             >
               <div className="flex items-start justify-between gap-[4mm]">
-                <p className="font-sans text-[8.5px] font-medium tracking-[0.16em] text-[#7c6844] uppercase">
+                <p className="font-sans text-[8.5px] font-medium tracking-[0.16em] text-nardo uppercase">
                   Prix maximum d'achat foncier
                 </p>
-                <p className="border border-[#1b2430] px-[2mm] py-px font-sans text-[8px] font-medium tracking-[0.14em] uppercase">
+                <p className="bg-fluo px-[2mm] py-px font-sans text-[8px] font-medium tracking-[0.14em] text-nardo uppercase">
                   {status.label}
                 </p>
               </div>
@@ -327,7 +338,7 @@ export function FinancialReportView({
                 {formatChf(result.maxPurchasePriceChfPerParcelM2)}
                 <span className="font-normal text-[#5e6872]"> / m² de terrain</span>
               </p>
-              <dl className="mt-[3mm] grid grid-cols-3 gap-[4mm] border-t border-[#e4dfd6] pt-[2mm]">
+              <dl className="mt-[2.4mm] grid grid-cols-3 gap-[4mm] border-t border-nardo/15 pt-[1.6mm]">
                 <div>
                   <dt className="font-sans text-[8px] tracking-[0.1em] text-[#5e6872] uppercase">Valeur résiduelle</dt>
                   <dd className="mt-px font-sans font-medium tabular-nums">{formatChf(result.residualLandValueChf)}</dd>
@@ -375,12 +386,8 @@ export function FinancialReportView({
         ) : null}
       </div>
 
-      <footer className="mt-auto border-t border-[#1b2430] pt-[2.5mm]">
-        <p className="text-[8px] leading-snug text-[#5e6872]">
-          Réserves. Analyse indicative de faisabilité, établie sur des hypothèses de prix et de ratios. Elle est hors
-          audit de sol, hors étude de pollution et hors contrôle géotechnique. Toute décision d'acquisition reste
-          soumise à validation notariale et bancaire.
-        </p>
+      <footer className="mt-auto border-t-[2.5px] border-fluo pt-[2mm]">
+        <p className="text-[7.5px] leading-[1.28] text-[#5e6872]">{LIABILITY_NOTICE}</p>
         <div className="mt-[1.5mm] flex items-center justify-between font-sans text-[8px] tracking-[0.12em] text-[#8a8175] uppercase">
           <p>Bilan financier & potentiel foncier</p>
           <p>Page 1 / 1</p>
@@ -469,9 +476,11 @@ export function FinancialReportDialog({
 
 function SectionHeading({ index, title, kicker }: { index: string; title: string; kicker: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 border-b border-[#1b2430] pb-[1.2mm]">
+    <div className="flex items-baseline justify-between gap-3 border-b border-fluo pb-[1mm]">
       <h2 className="text-[12.5px] font-semibold tracking-tight">
-        <span className="mr-[2mm] font-sans text-[9px] font-medium tracking-[0.16em] text-[#7c6844]">{index}</span>
+        <span className="mr-[2mm] bg-fluo px-[1.2mm] font-sans text-[9px] font-medium tracking-[0.16em] text-nardo">
+          {index}
+        </span>
         {title}
       </h2>
       <p className="font-sans text-[8px] tracking-[0.14em] text-[#5e6872] uppercase">{kicker}</p>
@@ -481,7 +490,7 @@ function SectionHeading({ index, title, kicker }: { index: string; title: string
 
 function Fact({ label, value, detail }: { label: string; value: string; detail: string }) {
   return (
-    <div className="border-l border-[#e4dfd6] pl-[2.5mm]">
+    <div className="border-l-2 border-fluo pl-[2.5mm]">
       <p className="font-sans text-[8px] tracking-[0.12em] text-[#5e6872] uppercase">{label}</p>
       <p className="mt-px font-sans text-[12px] leading-tight font-semibold tabular-nums">{value}</p>
       <p className="mt-px text-[8.5px] text-[#5e6872]">{detail}</p>
@@ -504,25 +513,25 @@ function BenchmarkChart({
 
   return (
     <figure className="mt-[2.5mm]" role="img" aria-label={reading}>
-      <CompareBar label="Prix maximum d'achat" value={Math.max(price, 0)} ceiling={ceiling} tone="ink" />
+      <CompareBar label="Prix maximum d'achat" value={Math.max(price, 0)} ceiling={ceiling} tone="accent" />
       <div className="mt-[1.6mm]">
-        <CompareBar label="Médiane du district" value={benchmark.medianChfPerParcelM2} ceiling={ceiling} tone="brass" />
+        <CompareBar label="Médiane du district" value={benchmark.medianChfPerParcelM2} ceiling={ceiling} tone="ink" />
       </div>
-      <div className="relative mt-[2mm] h-[3.2mm] bg-[#f1eee8]">
+      <div className="relative mt-[2mm] h-[3.2mm] bg-mist">
         <div
-          className="absolute inset-y-0 bg-[#e4d5bc]"
+          className="absolute inset-y-0 bg-fluo/45"
           style={{
             left: `${shareOf(benchmark.lowerQuartileChfPerParcelM2, ceiling)}%`,
             width: `${shareOf(benchmark.upperQuartileChfPerParcelM2 - benchmark.lowerQuartileChfPerParcelM2, ceiling)}%`,
           }}
         />
         <div
-          className="absolute inset-y-0 w-px bg-[#7c6844]"
+          className="absolute inset-y-0 w-px bg-nardo"
           style={{ left: `${shareOf(benchmark.medianChfPerParcelM2, ceiling)}%` }}
         />
         {price > 0 ? (
           <div
-            className="absolute -top-[0.8mm] h-[4.8mm] w-[2px] bg-[#1b2430]"
+            className="absolute -top-[0.8mm] h-[4.8mm] w-[2px] bg-nardo"
             style={{ left: `${shareOf(price, ceiling)}%` }}
           />
         ) : null}
@@ -536,13 +545,13 @@ function BenchmarkChart({
       </div>
       <figcaption className="mt-[1mm] flex flex-wrap gap-x-[4mm] gap-y-[0.5mm] font-sans text-[8px] tracking-[0.04em] text-[#5e6872] uppercase">
         <span className="inline-flex items-center gap-[1.5mm]">
-          <span className="inline-block h-[2mm] w-[4mm] bg-[#1b2430]" /> Prix calculé
+          <span className="inline-block h-[2mm] w-[4mm] bg-fluo" /> Prix calculé
         </span>
         <span className="inline-flex items-center gap-[1.5mm]">
-          <span className="inline-block h-[2mm] w-[4mm] bg-[#7c6844]" /> Médiane
+          <span className="inline-block h-[2mm] w-[4mm] bg-nardo" /> Médiane
         </span>
         <span className="inline-flex items-center gap-[1.5mm]">
-          <span className="inline-block h-[2mm] w-[4mm] bg-[#e4d5bc]" /> Quartiles
+          <span className="inline-block h-[2mm] w-[4mm] bg-fluo/45" /> Quartiles
         </span>
       </figcaption>
     </figure>
@@ -558,7 +567,7 @@ function CompareBar({
   label: string;
   value: number;
   ceiling: number;
-  tone: "ink" | "brass";
+  tone: "accent" | "ink";
 }) {
   return (
     <div>
@@ -566,13 +575,34 @@ function CompareBar({
         <p className="text-[10px]">{label}</p>
         <p className="font-sans text-[10px] font-medium tabular-nums">{formatGrouped(value)} CHF/m²</p>
       </div>
-      <div className="mt-[0.8mm] h-[2.2mm] bg-[#f1eee8]">
+      <div className="mt-[0.8mm] h-[2.2mm] bg-mist">
         <div
-          className={tone === "ink" ? "h-full bg-[#1b2430]" : "h-full bg-[#7c6844]"}
+          className={tone === "accent" ? "h-full bg-fluo" : "h-full bg-nardo"}
           style={{ width: `${shareOf(value, ceiling)}%` }}
         />
       </div>
     </div>
+  );
+}
+
+function ReportLogo() {
+  const [step, setStep] = useState<"svg" | "png" | "fallback">("svg");
+
+  if (step === "fallback") {
+    return (
+      <span className="flex h-[11mm] w-[16mm] shrink-0 items-center justify-end font-sans text-[8px] tracking-[0.14em] text-glacier uppercase">
+        PdC
+      </span>
+    );
+  }
+
+  return (
+    <img
+      src={step === "svg" ? "/logo.svg" : "/logo.png"}
+      alt="permisdeconstruire.ch"
+      className="h-[12mm] w-[12mm] shrink-0 object-contain"
+      onError={() => setStep(step === "svg" ? "png" : "fallback")}
+    />
   );
 }
 

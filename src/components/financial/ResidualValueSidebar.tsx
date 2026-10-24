@@ -54,6 +54,7 @@ interface ResidualValueSidebarProps {
   syncedFromStudio?: boolean;
   userId?: string | null;
   accessToken?: string | null;
+  reportAuthor?: string | null;
   className?: string;
 }
 
@@ -83,6 +84,7 @@ export function ResidualValueSidebar({
   syncedFromStudio = false,
   userId = null,
   accessToken = null,
+  reportAuthor = null,
   className,
 }: ResidualValueSidebarProps) {
   const [controls, setControls] = useState<ControlState>(INITIAL_CONTROLS);
@@ -408,6 +410,7 @@ export function ResidualValueSidebar({
           financials={input.financials}
           result={outcome.result}
           site={reportSite}
+          author={reportAuthor}
           onClose={() => setReportOpen(false)}
         />
       ) : null}

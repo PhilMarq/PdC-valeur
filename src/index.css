@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+@theme {
+  --color-nardo: #121316;
+  --color-mist: #f5f5f7;
+  --color-glacier: #90929e;
+  --color-fluo: #d2f802;
+}
+
 html,
 body,
 #root {
@@ -26,7 +33,7 @@ body {
   font-family: "Iowan Old Style", Palatino, "Palatino Linotype", Georgia, serif;
   font-size: 11px;
   line-height: 1.35;
-  color: #1b2430;
+  color: #121316;
   print-color-adjust: exact;
   -webkit-print-color-adjust: exact;
 }
