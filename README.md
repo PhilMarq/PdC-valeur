@@ -15,12 +15,13 @@ Le Studio ouvre le module dans un cadre pointé vers l’adresse canonique. Les 
 ```html
 <iframe
   title="Valeur résiduelle du foncier"
-  src="https://valeur.permisdeconstruire.ch/?canton=VD&commune=Morges&parcelle=4521&sre=2380&spd=2860&sia=11200&parcel=1680&userId=USER_ID&token=ACCESS_TOKEN&author=Cabinet%20Exemple"
+  src="https://valeur.permisdeconstruire.ch/?embed=true&canton=VD&commune=Morges&parcelle=4521&sre=2380&spd=2860&sia=11200&parcel=1680&userId=USER_ID&token=ACCESS_TOKEN&author=Cabinet%20Exemple"
 ></iframe>
 ```
 
 | Paramètre | Rôle |
 | --- | --- |
+| `embed=true` | Volet seul, sans le panneau « Studio 3D » |
 | `sre`, `spd` | Surfaces en m² |
 | `sia` ou `volume` | Volume SIA 416 en m³ |
 | `parcel` ou `terrain` | Surface de la parcelle en m² |

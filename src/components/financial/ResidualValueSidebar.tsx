@@ -55,6 +55,8 @@ interface ResidualValueSidebarProps {
   userId?: string | null;
   accessToken?: string | null;
   reportAuthor?: string | null;
+  /** Volet plein cadre, sans la colonne factice du Studio. */
+  embedded?: boolean;
   className?: string;
 }
 
@@ -85,6 +87,7 @@ export function ResidualValueSidebar({
   userId = null,
   accessToken = null,
   reportAuthor = null,
+  embedded = false,
   className,
 }: ResidualValueSidebarProps) {
   const [controls, setControls] = useState<ControlState>(INITIAL_CONTROLS);
@@ -196,7 +199,8 @@ export function ResidualValueSidebar({
   return (
     <aside
       className={cx(
-        "flex h-full w-full shrink-0 flex-col border-neutral-200 bg-white text-neutral-950 sm:w-[28rem] sm:border-l",
+        "flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-white text-neutral-950",
+        embedded ? "max-w-none" : "border-neutral-200 sm:w-[28rem] sm:flex-none sm:border-l",
         className,
       )}
     >
@@ -242,7 +246,7 @@ export function ResidualValueSidebar({
         </ul>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
         <div className="sticky top-0 z-10 border-b border-neutral-200 bg-white px-5 py-4 shadow-sm">
           {outcome.ok ? (
             <ImpactCard result={outcome.result} marginRate={input.financials.developerMarginRateOnExit} />
