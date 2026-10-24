@@ -11,6 +11,7 @@ import type {
   ResidualLandValueResult,
   SwissCanton,
 } from "../../server/financial/types.ts";
+import { getLandBenchmark, type LandBenchmark } from "../../server/financial/cantonalStats.ts";
 
 const COMFORT_MARGIN = 0.12;
 const COMFORT_RESIDUAL_SHARE = 0.12;
@@ -90,6 +91,7 @@ export function FinancialReportView({
   issuedAt = new Date(),
   author = null,
 }: FinancialReportViewProps) {
+  const benchmark = getLandBenchmark(geometry.canton, site.locality);
   const status = operationStatus(result, financials.developerMarginRateOnExit);
   const basis = result.exitSurfaceBasis === "sre" ? "SRE" : "SPd";
   const otherBasis = result.exitSurfaceBasis === "sre" ? "SPd" : "SRE";
@@ -362,18 +364,22 @@ export function FinancialReportView({
         <section className="break-inside-avoid">
           <SectionHeading index="04" title="Benchmarking foncier cantonal" kicker="Transactions" />
           <p className="mt-[2mm] text-[10px] text-[#3c4652]">
-            Prix d'achat calculé et médiane des transactions foncières du {site.benchmark.areaLabel}.
+            Prix d'achat calculé et médiane des transactions foncières du {benchmark.areaLabel}.
           </p>
           <BenchmarkChart
             pricePerM2={result.maxPurchasePriceChfPerParcelM2}
-            benchmark={site.benchmark}
+            benchmark={benchmark}
           />
-          <p className="mt-[2mm] text-[10px] leading-snug">{benchmarkReading(result.maxPurchasePriceChfPerParcelM2, site.benchmark)}</p>
+          <p className="mt-[2mm] text-[10px] leading-snug">{benchmarkReading(result.maxPurchasePriceChfPerParcelM2, benchmark)}</p>
           <p className="mt-[1mm] text-[8.5px] leading-snug text-[#5e6872]">
-            Médiane {formatGrouped(site.benchmark.medianChfPerParcelM2)} CHF/m², quartiles{" "}
-            {formatGrouped(site.benchmark.lowerQuartileChfPerParcelM2)} –{" "}
-            {formatGrouped(site.benchmark.upperQuartileChfPerParcelM2)} CHF/m², {site.benchmark.periodLabel}. Ordre de
-            grandeur de cadrage pour terrain à bâtir : cette référence n'est pas une extraction du registre foncier.
+            Médiane {formatGrouped(benchmark.medianChfPerParcelM2)} CHF/m², quartiles{" "}
+            {formatGrouped(benchmark.lowerQuartileChfPerParcelM2)} –{" "}
+            {formatGrouped(benchmark.upperQuartileChfPerParcelM2)} CHF/m², {benchmark.periodLabel}.{" "}
+            {geometry.canton === "FR" ? (
+              <span>Source officielle : Service de la statistique du canton de Fribourg (StatA).</span>
+            ) : (
+              <span>Ordre de grandeur de cadrage pour terrain à bâtir : cette référence n'est pas une extraction du registre foncier.</span>
+            )}
           </p>
         </section>
 
@@ -503,7 +509,7 @@ function BenchmarkChart({
   benchmark,
 }: {
   pricePerM2: number;
-  benchmark: ReportSite["benchmark"];
+  benchmark: LandBenchmark;
 }) {
   const price = Math.round(pricePerM2);
   const ceiling = niceCeiling(
@@ -638,7 +644,7 @@ function operationStatus(
   };
 }
 
-function benchmarkReading(pricePerM2: number, benchmark: ReportSite["benchmark"]): string {
+function benchmarkReading(pricePerM2: number, benchmark: LandBenchmark): string {
   if (!(pricePerM2 > 0)) {
     return "Ces hypothèses ne dégagent pas de prix d'achat. La comparaison avec les transactions du secteur ne s'applique pas.";
   }
