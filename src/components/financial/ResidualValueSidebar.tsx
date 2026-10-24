@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Box,
   ChevronDown,
@@ -11,6 +11,12 @@ import {
 } from "lucide-react";
 import { FinancialReportDialog } from "./FinancialReportView.tsx";
 import { calculateResidualLandValue } from "../../server/financial/residualCalculator.ts";
+import {
+  consumeTokenForValuation,
+  getUserTokenBalance,
+  TokenServiceError,
+  type ValuationProjectDetails,
+} from "../../services/tokenService.ts";
 import {
   MORGES_CONTROLS,
   MORGES_GEOMETRY,
@@ -46,6 +52,8 @@ interface ResidualValueSidebarProps {
   geometry?: GeometricInputs;
   reportSite?: ReportSite;
   syncedFromStudio?: boolean;
+  userId?: string | null;
+  accessToken?: string | null;
   className?: string;
 }
 
@@ -73,11 +81,19 @@ export function ResidualValueSidebar({
   geometry = MORGES_GEOMETRY,
   reportSite = MORGES_REPORT_SITE,
   syncedFromStudio = false,
+  userId = null,
+  accessToken = null,
   className,
 }: ResidualValueSidebarProps) {
   const [controls, setControls] = useState<ControlState>(INITIAL_CONTROLS);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [consuming, setConsuming] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [balance, setBalance] = useState<number | null>(null);
+  const [balanceError, setBalanceError] = useState<string | null>(null);
+  const [balanceLoading, setBalanceLoading] = useState(false);
 
   const input: ResidualLandValueInput = {
     geometry,
@@ -97,6 +113,83 @@ export function ResidualValueSidebar({
   const patch = (partial: Partial<ControlState>) => {
     setControls((current) => ({ ...current, ...partial }));
   };
+  const demoMode = userId === null;
+  const projectDetails: ValuationProjectDetails = {
+    commune: reportSite.locality,
+    canton: geometry.canton,
+    parcelle: reportSite.cadastralReference,
+    sreM2: geometry.sreM2,
+    spdM2: geometry.spdM2,
+    volumeSia416M3: geometry.volumeSia416M3,
+    parcelAreaM2: geometry.parcelAreaM2,
+  };
+
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    setBalanceLoading(true);
+    setBalanceError(null);
+    setConfirming(false);
+    setNotice(null);
+    getUserTokenBalance(userId, accessToken)
+      .then((next) => {
+        if (!cancelled) setBalance(next);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setBalance(null);
+        setBalanceError(error instanceof Error ? error.message : "Le solde de jetons n'a pas pu être lu.");
+      })
+      .finally(() => {
+        if (!cancelled) setBalanceLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, accessToken]);
+
+  const insufficient = !demoMode && balance === 0;
+  const exportBlocked = !outcome.ok || balanceLoading || insufficient || balanceError !== null;
+
+  const openReport = () => {
+    if (!outcome.ok) return;
+    if (demoMode) {
+      setReportOpen(true);
+      return;
+    }
+    if (insufficient || balanceError || balance === null) return;
+    setNotice(null);
+    setConfirming(true);
+  };
+
+  const confirmExport = async () => {
+    if (!userId || consuming) return;
+    setConsuming(true);
+    setNotice(null);
+    try {
+      const spent = await consumeTokenForValuation(userId, projectDetails, accessToken);
+      if (!spent) {
+        setBalance(0);
+        setConfirming(false);
+        setNotice("Solde de jetons insuffisant");
+        return;
+      }
+      const next = await getUserTokenBalance(userId, accessToken);
+      setBalance(next);
+      setConfirming(false);
+      setReportOpen(true);
+    } catch (error) {
+      setConfirming(false);
+      if (error instanceof TokenServiceError && error.code === "insufficient") {
+        setBalance(0);
+        setNotice("Solde de jetons insuffisant");
+        return;
+      }
+      setNotice(error instanceof Error ? error.message : "Le jeton n'a pas pu être déduit.");
+    } finally {
+      setConsuming(false);
+    }
+  };
 
   return (
     <aside
@@ -112,6 +205,27 @@ export function ResidualValueSidebar({
             className="mb-2 inline-flex rounded-full bg-neutral-100 px-2.5 py-1 text-[11px] font-medium text-neutral-600"
           >
             Projet synchronisé depuis le Studio 3D
+          </p>
+        ) : null}
+        {!demoMode ? (
+          <p className="mb-2" data-testid="token-balance">
+            {balanceLoading ? (
+              <span className="inline-flex rounded-full bg-neutral-100 px-2.5 py-1 text-[11px] font-medium text-neutral-500">
+                Lecture du solde…
+              </span>
+            ) : balanceError ? (
+              <span className="inline-flex rounded-full bg-neutral-100 px-2.5 py-1 text-[11px] font-medium text-neutral-600">
+                Solde indisponible
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-2.5 py-1 text-[11px] font-medium text-neutral-700">
+                <span
+                  className={cx("size-1.5 rounded-full", balance !== null && balance > 0 ? "bg-emerald-500" : "bg-neutral-400")}
+                  aria-hidden
+                />
+                {formatTokenBalance(balance ?? 0)}
+              </span>
+            )}
           </p>
         ) : null}
         <h1 className="text-lg font-semibold tracking-tight">Bilan Foncier Résiduel</h1>
@@ -228,22 +342,64 @@ export function ResidualValueSidebar({
       </div>
 
       <footer className="border-t border-neutral-200 px-5 py-4">
-        <button
-          type="button"
-          data-testid="open-financial-report"
-          disabled={!outcome.ok}
-          aria-haspopup="dialog"
-          onClick={() => setReportOpen(true)}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-neutral-950 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-neutral-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900 disabled:cursor-not-allowed disabled:bg-neutral-200 disabled:text-neutral-500"
-        >
-          <Printer className="size-4" aria-hidden />
-          Générer / Imprimer la Fiche PDF
-        </button>
-        <p className="mt-2 text-center text-xs text-neutral-500">
-          {outcome.ok
-            ? "Aperçu au format A4, prêt pour l'impression."
-            : "Le calcul doit aboutir pour éditer la fiche."}
-        </p>
+        {confirming ? (
+          <div className="rounded-xl border border-neutral-200 px-3 py-3">
+            <p className="text-sm text-neutral-800">Cette action déduira 1 jeton.</p>
+            <div className="mt-3 flex gap-2">
+              <button
+                type="button"
+                disabled={consuming}
+                onClick={() => void confirmExport()}
+                className="inline-flex flex-1 items-center justify-center rounded-lg bg-neutral-950 px-3 py-2 text-sm font-medium text-white disabled:bg-neutral-300"
+              >
+                {consuming ? "Déduction…" : "Confirmer"}
+              </button>
+              <button
+                type="button"
+                disabled={consuming}
+                onClick={() => setConfirming(false)}
+                className="inline-flex flex-1 items-center justify-center rounded-lg border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-800"
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            data-testid="open-financial-report"
+            disabled={exportBlocked}
+            aria-haspopup="dialog"
+            onClick={openReport}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-neutral-950 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-neutral-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900 disabled:cursor-not-allowed disabled:bg-neutral-200 disabled:text-neutral-500"
+          >
+            <Printer className="size-4" aria-hidden />
+            Générer / Imprimer la Fiche PDF
+          </button>
+        )}
+        {insufficient || notice === "Solde de jetons insuffisant" ? (
+          <p role="alert" data-testid="token-shortage" className="mt-2 text-center text-xs font-medium text-red-700">
+            Solde de jetons insuffisant
+          </p>
+        ) : notice ? (
+          <p role="alert" className="mt-2 text-center text-xs text-red-700">
+            {notice}
+          </p>
+        ) : balanceError ? (
+          <p role="alert" className="mt-2 text-center text-xs text-red-700">
+            {balanceError}
+          </p>
+        ) : (
+          <p className="mt-2 text-center text-xs text-neutral-500">
+            {!outcome.ok
+              ? "Le calcul doit aboutir pour éditer la fiche."
+              : demoMode
+                ? "Mode Démo"
+                : balanceLoading
+                  ? "Lecture du solde de jetons."
+                  : "Aperçu au format A4, prêt pour l'impression."}
+          </p>
+        )}
       </footer>
 
       {reportOpen && outcome.ok ? (
@@ -574,6 +730,11 @@ function formatChf(value: number): string {
 
 function formatPoints(value: number): string {
   return new Intl.NumberFormat("fr-CH", { maximumFractionDigits: 1 }).format(value);
+}
+
+function formatTokenBalance(balance: number): string {
+  const count = Math.max(0, Math.trunc(balance));
+  return count > 1 ? `${count} jetons disponibles` : `${count} jeton disponible`;
 }
 
 function cx(...parts: Array<string | false | null | undefined>): string {

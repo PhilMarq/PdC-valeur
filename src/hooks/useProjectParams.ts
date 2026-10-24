@@ -23,12 +23,17 @@ const PARAM_KEYS = [
 ] as const;
 
 const CANTONS = new Set<string>(SWISS_CANTONS);
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface ProjectParams {
   geometry: GeometricInputs;
   site: ReportSite;
   /** Au moins un paramètre de scénario est présent dans l'URL. */
   syncedFromStudio: boolean;
+  /** Utilisateur transmis par le Studio. Absent en mode démo. */
+  userId: string | null;
+  /** Jeton d'accès Supabase, s'il est transmis à côté de l'identifiant. */
+  accessToken: string | null;
 }
 
 export function useProjectParams(search?: string): ProjectParams {
@@ -40,6 +45,8 @@ export function useProjectParams(search?: string): ProjectParams {
 export function readProjectParams(search: string): ProjectParams {
   const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
   const parcelNumber = readLabel(params.get("parcelle"));
+  const accessToken = readAccessToken(params.get("token"));
+  const userId = readUserId(params.get("userId")) ?? readUserId(params.get("token")) ?? userIdFromAccessToken(accessToken);
 
   const geometry: GeometricInputs = {
     sreM2: readPositive(params.get("sre")) ?? MORGES_GEOMETRY.sreM2,
@@ -67,6 +74,8 @@ export function readProjectParams(search: string): ProjectParams {
     geometry,
     site,
     syncedFromStudio: PARAM_KEYS.some((key) => params.has(key)),
+    userId,
+    accessToken,
   };
 }
 
@@ -88,4 +97,32 @@ function readLabel(raw: string | null): string | null {
   if (raw === null) return null;
   const trimmed = raw.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function readUserId(raw: string | null): string | null {
+  if (raw === null) return null;
+  const value = raw.trim();
+  return UUID_PATTERN.test(value) ? value.toLowerCase() : null;
+}
+
+function readAccessToken(raw: string | null): string | null {
+  if (raw === null) return null;
+  const value = raw.trim();
+  const parts = value.split(".");
+  if (parts.length !== 3 || parts.some((part) => part.length === 0)) return null;
+  return value;
+}
+
+function userIdFromAccessToken(accessToken: string | null): string | null {
+  if (!accessToken) return null;
+  const payload = accessToken.split(".")[1];
+  if (!payload) return null;
+  try {
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+    const json = JSON.parse(atob(padded)) as { sub?: unknown };
+    return readUserId(typeof json.sub === "string" ? json.sub : null);
+  } catch {
+    return null;
+  }
 }

@@ -13,6 +13,8 @@ export default function App() {
         geometry={project.geometry}
         reportSite={project.site}
         syncedFromStudio={project.syncedFromStudio}
+        userId={project.userId}
+        accessToken={project.accessToken}
       />
     </div>
   );
