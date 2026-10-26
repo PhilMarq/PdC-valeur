@@ -1,19 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseClient } from "./supabaseClient.ts";
 
-export interface ValuationProjectDetails {
-  commune: string;
-  canton: string;
-  parcelle: string;
-  sreM2: number;
-  spdM2: number;
-  volumeSia416M3: number;
-  parcelAreaM2: number;
-}
-
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export type TokenErrorCode = "insufficient" | "unauthenticated" | "mismatch" | "config" | "unavailable";
+export type TokenErrorCode = "unauthenticated" | "mismatch" | "config" | "unavailable";
 
 export class TokenServiceError extends Error {
   readonly code: TokenErrorCode;
@@ -48,40 +38,6 @@ export async function getUserTokenBalance(userId: string, accessToken?: string |
     "unauthenticated",
     "Session Supabase absente : le Studio doit transmettre le jeton de connexion.",
   );
-}
-
-/**
- * Débite 1 crédit via `deduct_credit()`. Le montant et l'utilisateur viennent
- * du jeton de session. L'historique d'usage n'est écrit que si la base
- * l'autorise : le journal `credit_transactions` est aujourd'hui réservé aux
- * crédits d'achat.
- */
-export async function consumeTokenForValuation(
-  userId: string,
-  projectDetails: ValuationProjectDetails,
-  accessToken?: string | null,
-): Promise<boolean> {
-  assertProject(projectDetails);
-  const client = await clientFor(userId, accessToken);
-  const { data, error } = await client.rpc("deduct_credit");
-  if (error) {
-    assertAccepted(error);
-    throw new TokenServiceError("unavailable", "Le jeton n'a pas pu être déduit.");
-  }
-
-  const payload = readPayload(data);
-  if (payload.ok) {
-    await recordUsage(client, userId, projectDetails);
-    return true;
-  }
-  if (payload.error === "insufficient") return false;
-  if (payload.error === "unauthenticated") {
-    throw new TokenServiceError(
-      "unauthenticated",
-      "Session Supabase absente : le Studio doit transmettre le jeton de connexion.",
-    );
-  }
-  throw new TokenServiceError("unavailable", "Le jeton n'a pas pu être déduit.");
 }
 
 async function clientFor(userId: string, accessToken?: string | null): Promise<SupabaseClient> {
@@ -133,46 +89,4 @@ function assertAccepted(error: { message?: string; code?: string }): void {
   if (/jwt|unauthor|invalid claim|PGRST301|401/i.test(text)) {
     throw new TokenServiceError("unauthenticated", "Jeton de session invalide ou expiré.");
   }
-}
-
-async function recordUsage(
-  client: SupabaseClient,
-  userId: string,
-  projectDetails: ValuationProjectDetails,
-): Promise<void> {
-  const { error } = await client.from("credit_transactions").insert({
-    user_id: userId,
-    delta: -1,
-    reason: "usage",
-    plan_id: usageLabel(projectDetails),
-  });
-  if (!error) return;
-  const denied = /permission|row-level security|42501|rls/i.test(error.message);
-  if (!denied) console.error("[jetons] historique non enregistré");
-}
-
-function usageLabel(details: ValuationProjectDetails): string {
-  return `fiche-fonciere ${details.canton} ${details.commune} ${details.parcelle}`.slice(0, 160);
-}
-
-function assertProject(details: ValuationProjectDetails): void {
-  if (!details?.parcelle || !details.canton || !details.commune) {
-    throw new TokenServiceError("unavailable", "Détails du projet incomplets.");
-  }
-}
-
-function readPayload(data: unknown): { ok: boolean; error: string | null } {
-  let value = data;
-  if (typeof value === "string") {
-    try {
-      value = JSON.parse(value) as unknown;
-    } catch {
-      return { ok: false, error: null };
-    }
-  }
-  if (Array.isArray(value)) value = value[0];
-  if (!value || typeof value !== "object") return { ok: false, error: null };
-  const row = value as Record<string, unknown>;
-  const error = typeof row.error === "string" ? row.error : null;
-  return { ok: row.ok === true, error };
 }

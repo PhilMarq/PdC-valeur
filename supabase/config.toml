@@ -1,0 +1,3 @@
+# Passerelle : preview n'envoie pas de jeton. L'export vérifie le Bearer dans la fonction.
+[functions.calculate-residual]
+verify_jwt = false

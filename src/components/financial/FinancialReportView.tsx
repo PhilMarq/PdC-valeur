@@ -4,14 +4,14 @@ import { Printer, X } from "lucide-react";
 import {
   MORGES_REPORT_SITE,
   type ReportSite,
-} from "../../server/financial/morgesScenario.ts";
+} from "../../financial/morgesScenario.ts";
 import type {
   FinancialParameters,
   GeometricInputs,
   ResidualLandValueResult,
   SwissCanton,
-} from "../../server/financial/types.ts";
-import { getLandBenchmark, type LandBenchmark } from "../../server/financial/cantonalStats.ts";
+} from "../../financial/types.ts";
+import { getLandBenchmark, type LandBenchmark } from "../../financial/cantonalStats.ts";
 
 const COMFORT_MARGIN = 0.12;
 const COMFORT_RESIDUAL_SHARE = 0.12;

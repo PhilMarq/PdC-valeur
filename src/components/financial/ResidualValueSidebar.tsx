@@ -10,24 +10,23 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { FinancialReportDialog } from "./FinancialReportView.tsx";
-import { calculateResidualLandValue } from "../../server/financial/residualCalculator.ts";
 import {
-  consumeTokenForValuation,
-  getUserTokenBalance,
-  TokenServiceError,
-  type ValuationProjectDetails,
-} from "../../services/tokenService.ts";
+  exportResidualCalculation,
+  ResidualRequestError,
+  useResidualCalculation,
+} from "../../hooks/useResidualCalculation.ts";
+import { getUserTokenBalance } from "../../services/tokenService.ts";
 import {
   MORGES_CONTROLS,
   MORGES_GEOMETRY,
   MORGES_REPORT_SITE,
   type ReportSite,
-} from "../../server/financial/morgesScenario.ts";
+} from "../../financial/morgesScenario.ts";
 import type {
   GeometricInputs,
   ResidualLandValueInput,
   ResidualLandValueResult,
-} from "../../server/financial/types.ts";
+} from "../../financial/types.ts";
 
 const EXIT_PRICE = { min: 6_000, max: 14_000, step: 100 };
 const CFC2_COST = { min: 600, max: 1_200, step: 10 };
@@ -99,6 +98,7 @@ export function ResidualValueSidebar({
   const [balance, setBalance] = useState<number | null>(null);
   const [balanceError, setBalanceError] = useState<string | null>(null);
   const [balanceLoading, setBalanceLoading] = useState(false);
+  const [officialResult, setOfficialResult] = useState<ResidualLandValueResult | null>(null);
 
   const input: ResidualLandValueInput = {
     geometry,
@@ -114,20 +114,13 @@ export function ResidualValueSidebar({
     },
   };
 
-  const outcome = computeResidual(input);
+  const { result, isCalculating, error: calculationError } = useResidualCalculation(input);
   const patch = (partial: Partial<ControlState>) => {
     setControls((current) => ({ ...current, ...partial }));
   };
   const demoMode = userId === null;
-  const projectDetails: ValuationProjectDetails = {
-    commune: reportSite.locality,
-    canton: geometry.canton,
-    parcelle: reportSite.cadastralReference,
-    sreM2: geometry.sreM2,
-    spdM2: geometry.spdM2,
-    volumeSia416M3: geometry.volumeSia416M3,
-    parcelAreaM2: geometry.parcelAreaM2,
-  };
+  const previewReady = result !== null && calculationError === null;
+  const ficheResult = officialResult ?? result;
 
   useEffect(() => {
     if (!userId) return;
@@ -154,10 +147,10 @@ export function ResidualValueSidebar({
   }, [userId, accessToken]);
 
   const insufficient = !demoMode && balance === 0;
-  const exportBlocked = !outcome.ok || balanceLoading || insufficient || balanceError !== null;
+  const exportBlocked = !previewReady || balanceLoading || insufficient || balanceError !== null;
 
   const openReport = () => {
-    if (!outcome.ok) return;
+    if (!previewReady) return;
     if (demoMode) {
       setReportOpen(true);
       return;
@@ -168,24 +161,22 @@ export function ResidualValueSidebar({
   };
 
   const confirmExport = async () => {
-    if (!userId || consuming) return;
+    if (!userId || !accessToken || consuming) return;
     setConsuming(true);
     setNotice(null);
     try {
-      const spent = await consumeTokenForValuation(userId, projectDetails, accessToken);
-      if (!spent) {
-        setBalance(0);
-        setConfirming(false);
-        setNotice("Solde de jetons insuffisant");
-        return;
+      const exported = await exportResidualCalculation(input, accessToken);
+      try {
+        setBalance(await getUserTokenBalance(userId, accessToken));
+      } catch {
+        setBalance((current) => (current === null ? null : Math.max(0, current - 1)));
       }
-      const next = await getUserTokenBalance(userId, accessToken);
-      setBalance(next);
+      setOfficialResult(exported);
       setConfirming(false);
       setReportOpen(true);
     } catch (error) {
       setConfirming(false);
-      if (error instanceof TokenServiceError && error.code === "insufficient") {
+      if (error instanceof ResidualRequestError && error.status === 402) {
         setBalance(0);
         setNotice("Solde de jetons insuffisant");
         return;
@@ -248,11 +239,19 @@ export function ResidualValueSidebar({
 
       <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
         <div className="sticky top-0 z-10 border-b border-neutral-200 bg-white px-5 py-4 shadow-sm">
-          {outcome.ok ? (
-            <ImpactCard result={outcome.result} marginRate={input.financials.developerMarginRateOnExit} />
-          ) : (
+          {result ? (
+            <ImpactCard
+              result={result}
+              marginRate={input.financials.developerMarginRateOnExit}
+              busy={isCalculating}
+            />
+          ) : calculationError ? (
             <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-              {outcome.message}
+              {calculationError}
+            </p>
+          ) : (
+            <p className="rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-500">
+              Calcul…
             </p>
           )}
         </div>
@@ -343,7 +342,7 @@ export function ResidualValueSidebar({
             ) : null}
           </section>
 
-          {outcome.ok ? <CountdownTable result={outcome.result} /> : null}
+          {result ? <CountdownTable result={result} /> : null}
         </div>
       </div>
 
@@ -397,25 +396,32 @@ export function ResidualValueSidebar({
           </p>
         ) : (
           <p className="mt-2 text-center text-xs text-neutral-500">
-            {!outcome.ok
-              ? "Le calcul doit aboutir pour éditer la fiche."
-              : demoMode
-                ? "Mode Démo"
-                : balanceLoading
-                  ? "Lecture du solde de jetons."
-                  : "Aperçu au format A4, prêt pour l'impression."}
+            {!result
+              ? isCalculating
+                ? "Calcul en cours."
+                : "Le calcul doit aboutir pour éditer la fiche."
+              : calculationError
+                ? calculationError
+                : demoMode
+                  ? "Mode Démo"
+                  : balanceLoading
+                    ? "Lecture du solde de jetons."
+                    : "Aperçu au format A4, prêt pour l'impression."}
           </p>
         )}
       </footer>
 
-      {reportOpen && outcome.ok ? (
+      {reportOpen && ficheResult ? (
         <FinancialReportDialog
           geometry={geometry}
           financials={input.financials}
-          result={outcome.result}
+          result={ficheResult}
           site={reportSite}
           author={reportAuthor}
-          onClose={() => setReportOpen(false)}
+          onClose={() => {
+            setReportOpen(false);
+            setOfficialResult(null);
+          }}
         />
       ) : null}
     </aside>
@@ -425,9 +431,11 @@ export function ResidualValueSidebar({
 function ImpactCard({
   result,
   marginRate,
+  busy = false,
 }: {
   result: ResidualLandValueResult;
   marginRate: number;
+  busy?: boolean;
 }) {
   const viability = assessViability(result, marginRate);
   const styles = TONE_STYLES[viability.tone];
@@ -436,6 +444,7 @@ function ImpactCard({
   return (
     <section
       aria-live="polite"
+      aria-busy={busy}
       data-testid="viability"
       data-viability={viability.tone}
       className={cx("rounded-2xl border px-4 py-4", styles.card)}
@@ -697,17 +706,6 @@ const TONE_STYLES: Record<ViabilityTone, { card: string; badge: string; text: st
     text: "text-red-900",
   },
 };
-
-function computeResidual(
-  input: ResidualLandValueInput,
-): { ok: true; result: ResidualLandValueResult } | { ok: false; message: string } {
-  try {
-    return { ok: true, result: calculateResidualLandValue(input) };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Le calcul n'a pas pu aboutir.";
-    return { ok: false, message };
-  }
-}
 
 function parseEditable(raw: string): number | null {
   const normalized = raw.replace(/\s/g, "").replaceAll("'", "").replaceAll("’", "").replace(",", ".");

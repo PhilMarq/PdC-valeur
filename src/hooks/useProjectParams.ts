@@ -3,12 +3,12 @@ import {
   MORGES_GEOMETRY,
   MORGES_REPORT_SITE,
   type ReportSite,
-} from "../server/financial/morgesScenario.ts";
+} from "../financial/morgesScenario.ts";
 import {
   SWISS_CANTONS,
   type GeometricInputs,
   type SwissCanton,
-} from "../server/financial/types.ts";
+} from "../financial/types.ts";
 
 const PARAM_KEYS = [
   "sre",

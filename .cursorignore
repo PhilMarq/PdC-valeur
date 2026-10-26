@@ -1,0 +1,22 @@
+# Bloquer les dépendances et builds
+node_modules/
+dist/
+.output/
+.vinxi/
+build/
+.vercel/
+
+# Bloquer les assets lourds qui consomment des tokens
+public/
+*.pdf
+*.svg
+*.png
+*.jpg
+*.csv
+*.json
+!package.json
+!tsconfig.json
+
+# Bloquer l'environnement
+.env*
+!*.env.example

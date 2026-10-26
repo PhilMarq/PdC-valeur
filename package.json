@@ -5,7 +5,6 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "demo:financial": "node --experimental-strip-types src/server/financial/demo.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
